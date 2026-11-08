@@ -11,8 +11,11 @@ struct Hand {
     // total is computed from cards, never stored, so it can't go out of sync
     // aces count as 1, and one ace is promoted to 11 if that doesn't bust
     int total() const;
+    int hardTotal() const;
+
     // true if an ace is currently counting as 11
     bool isSoft() const;
+    bool hasAce() const;
     bool isBust() const;
     // exactly two cards totaling 21 (split hands are handled by PlayerHand later)
     bool isBlackjack() const;

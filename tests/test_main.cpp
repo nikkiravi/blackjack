@@ -1,21 +1,14 @@
-// tests/test_main.cpp
+// tests/test_main.cpp: runs every test function and prints a summary
 #include "check.h"
-#include "card.h"
 
-void test_card_value() {
-    Card card1{Suit::Hearts, Rank::Ace};
-    CHECK(card1.value() == 1);
-
-    Card card2{Suit::Diamonds, Rank::Ten};
-    CHECK(card2.value() == 10);
-
-    Card card3{Suit::Clubs, Rank::Queen};
-    CHECK(card3.value() == 10);
-}
+// defined in test_card.cpp / test_hand.cpp; the linker connects them
+void test_card_value();
+void test_hand_total();
 
 int main() {
     test_card_value();
-    
+    test_hand_total();
+
     if(g_failures == 0){
         std::printf("All tests passed!\n");
     } else {
