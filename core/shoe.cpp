@@ -47,3 +47,14 @@ Card Shoe::dealCard() {
 size_t Shoe::remainingCards() const {
     return cards.size() - next;
 }
+
+bool Shoe::needsReshuffle(int percentPenetration) const {
+    if(percentPenetration < 0) {
+        percentPenetration = 0; // Ensure non-negative penetration percentage
+    } else if(percentPenetration > 100) {
+        percentPenetration = 100; // Ensure penetration percentage does not exceed 100
+    }
+    
+    size_t dealt = this->next; 
+    return dealt * 100 >= cards.size() * static_cast<size_t>(percentPenetration);
+}

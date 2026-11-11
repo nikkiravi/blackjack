@@ -13,6 +13,7 @@ struct Shoe {
     void shuffle(RandomGenerator& rng);
     Card dealCard(); // safety net when empty: wraps to the start (game reshuffles before this happens)
     size_t remainingCards() const; 
+    bool needsReshuffle(int percentPenetration) const;
 
 private:
     void initializeShoe(int numDecks);

@@ -136,3 +136,58 @@ void test_shoe() {
         CHECK(sameCard(s.dealCard(), first));
     }
 }
+
+// deals `n` cards from the shoe (test helper)
+static void dealMany(Shoe& s, int n) {
+    for (int i = 0; i < n; i++) {
+        s.dealCard();
+    }
+}
+
+void test_shoe_penetration() {
+    {   // fresh shoe: nothing dealt, no reshuffle yet
+        Shoe s;
+        CHECK(!s.needsReshuffle(75));
+    }
+    {   // 6 decks at 75%: the boundary is exactly 234 of 312 cards
+        Shoe s;
+        dealMany(s, 233);
+        CHECK(!s.needsReshuffle(75));         // one card short
+        s.dealCard();
+        CHECK(s.needsReshuffle(75));          // 234 dealt -> reshuffle
+    }
+    {   // 1 deck at 75%: boundary is 39 of 52
+        Shoe s(1);
+        dealMany(s, 38);
+        CHECK(!s.needsReshuffle(75));
+        s.dealCard();
+        CHECK(s.needsReshuffle(75));
+    }
+    {   // shuffling resets the deal position, so the request goes away
+        Shoe s(1);
+        SeededRandomGenerator rng(42);
+        dealMany(s, 40);
+        CHECK(s.needsReshuffle(75));
+        s.shuffle(rng);
+        CHECK(!s.needsReshuffle(75));
+    }
+    {   // 0% = reshuffle every round (continuous shuffler)
+        Shoe s(1);
+        CHECK(s.needsReshuffle(0));
+    }
+    {   // negative percent is clamped to 0
+        Shoe s(1);
+        CHECK(s.needsReshuffle(-10));
+    }
+    {   // above 100 is clamped to 100: only true once every card is dealt
+        Shoe s(1);
+        dealMany(s, 51);
+        CHECK(!s.needsReshuffle(150));
+        s.dealCard();
+        CHECK(s.needsReshuffle(150));
+    }
+    {   // empty shoe asks for a reshuffle, which is harmless (shuffle is a no-op)
+        Shoe s(0);
+        CHECK(s.needsReshuffle(75));
+    }
+}
