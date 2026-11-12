@@ -8,6 +8,7 @@ void test_fake_rng();
 void test_seeded_rng();
 void test_shoe();
 void test_shoe_penetration();
+void test_dealer();
 
 int main() {
     test_card_value();
@@ -16,6 +17,7 @@ int main() {
     test_seeded_rng();
     test_shoe();
     test_shoe_penetration();
+    test_dealer();
 
     if(g_failures == 0){
         std::printf("All tests passed!\n");
