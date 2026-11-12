@@ -1,0 +1,22 @@
+# .github/workflows/pr-description.yml: fails a PR whose description is empty or still just the template
+name: pr-description
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]   # "edited" re-runs it when you fix the description
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Make sure the description was filled in
+        env:
+          BODY: ${{ github.event.pull_request.body }}   # passed via env so PR text can't be run as shell code
+        run: |
+          # remove the template's HTML comments, headings and blank lines; see if anything is left
+          remaining=$(printf '%s' "$BODY" | sed 's/<!--.*-->//g' | grep -v '^\s*#' | grep -v '^\s*$' || true)
+          if [ -z "$remaining" ]; then
+            echo "::error::PR description is empty or still just the template. Please fill it in."
+            exit 1
+          fi
+          echo "Description looks good."
