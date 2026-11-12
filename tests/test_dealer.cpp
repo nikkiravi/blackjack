@@ -62,7 +62,7 @@ void test_dealer() {
     }
     {   // busted (22) -> stand; the dealer never draws past a bust
         Hand h = makeHand({Rank::King, Rank::Queen, Rank::Two});
-        CHECK(dealerShouldHit(h, s17));
+        CHECK(!dealerShouldHit(h, s17));
         CHECK(!dealerShouldHit(h, h17));
     }
     {   // empty hand (total 0) -> hit; the dealer always starts by drawing
