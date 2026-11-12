@@ -1,0 +1,21 @@
+# .github/workflows/tests.yml: builds and runs the PC unit tests on every push and pull request
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:        # lets you run it by hand from the Actions tab
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show compiler version
+        run: g++ --version
+
+      # same flags as the Makefile, plus -Werror so a new warning fails CI
+      - name: Build and run tests
+        run: make test CXXFLAGS="-std=c++17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror -g -fsanitize=address,undefined"
