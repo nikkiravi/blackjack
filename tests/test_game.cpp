@@ -205,8 +205,8 @@ void test_game_double() {
         Game g(rng);
         stackShoe(g, {Rank::Five, Rank::Ten, Rank::Six, Rank::Seven, Rank::Nine});
         g.handleEvent(Event::Deal);                   // P 11, bankroll 198
-        g.handleEvent(Event::Double);                 // + 9 = 20
-        CHECK(g.bankroll == 196);
+        g.handleEvent(Event::Double);                 // + 9 = 20, bankroll 196; dealer 17 -> win
+        CHECK(g.bankroll == 196 + 8);                 // a doubled $4 win returns $8
         CHECK(g.player_hands[0].bet == 4);
         CHECK(g.player_hands[0].doubled);
         CHECK(g.player_hands[0].hand.cards.size() == 3);

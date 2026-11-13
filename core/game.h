@@ -29,4 +29,5 @@ struct Game {
 private:
     void playDealer(); // dealer draws card
     void finishHand();
+    void settleRound(); // payout depending when the round is over 
 };

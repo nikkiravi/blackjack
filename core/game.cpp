@@ -1,5 +1,6 @@
 #include "game.h"
 #include "dealer.h"
+#include "payout.h"
 
 Game::Game(RandomGenerator& generator, const Rules& tableRules) : rules(tableRules), rng(generator) {
     shoe.shuffle(rng);
@@ -16,7 +17,16 @@ void Game::finishHand(){
         split_idx += 1;
     } else {
         playDealer();
+        settleRound();
         current_phase = Phase::RoundOver;
+    }
+}
+
+void Game::settleRound(){
+    bool isSplit = player_hands.size() > 1;
+    for(const PlayerHand& ph : player_hands){
+        Outcome result = handOutcome(ph.hand, dealer, isSplit);
+        bankroll += payout(result, ph.bet, rules); 
     }
 }
 
@@ -50,6 +60,7 @@ void Game::handleEvent(Event event) {
                 
                 if(player_hands[split_idx].hand.isBlackjack() || dealer.isBlackjack()) {
                     current_phase = Phase::RoundOver;
+                    settleRound();
                 } else {
                     current_phase = Phase::PlayerTurn; 
                 }
