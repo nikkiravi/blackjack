@@ -9,6 +9,8 @@ void test_seeded_rng();
 void test_shoe();
 void test_shoe_penetration();
 void test_dealer();
+void test_hand_outcome();
+void test_payout();
 void test_game_setup();
 void test_game_betting();
 void test_game_deal();
@@ -25,6 +27,8 @@ int main() {
     test_shoe();
     test_shoe_penetration();
     test_dealer();
+    test_hand_outcome();
+    test_payout();
     test_game_setup();
     test_game_betting();
     test_game_deal();
