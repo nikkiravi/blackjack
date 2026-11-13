@@ -30,4 +30,5 @@ private:
     void playDealer(); // dealer draws card
     void finishHand();
     void settleRound(); // payout depending when the round is over 
+    void clampBet(); // round down to a whole number of betStep
 };

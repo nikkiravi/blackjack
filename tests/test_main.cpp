@@ -18,6 +18,11 @@ void test_game_hit_stand();
 void test_game_double();
 void test_game_split();
 void test_game_round_over_and_broke();
+void test_game_payouts();
+void test_game_blackjack_payouts();
+void test_game_split_payouts();
+void test_game_broke();
+void test_game_bet_limits();
 
 int main() {
     test_card_value();
@@ -36,6 +41,11 @@ int main() {
     test_game_double();
     test_game_split();
     test_game_round_over_and_broke();
+    test_game_payouts();
+    test_game_blackjack_payouts();
+    test_game_split_payouts();
+    test_game_broke();
+    test_game_bet_limits();
 
     if(g_failures == 0){
         std::printf("All tests passed!\n");
