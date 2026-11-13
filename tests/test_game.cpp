@@ -1,18 +1,7 @@
 // tests/test_game.cpp: tests for the Game state machine (phases, betting, dealing, hit/stand/double/split)
 #include "check.h"
+#include "test_helpers.h"
 #include "game.h"
-#include <vector>
-
-// replaces the shoe with these ranks, dealt in this exact order (test helper)
-// deal order is: player, dealer, player, dealer, then any hits/splits/dealer draws
-// list every card the test needs: past the end the shoe wraps back to the first card
-static void stackShoe(Game& g, const std::vector<Rank>& ranks) {
-    g.shoe.cards.clear();
-    for (Rank r : ranks) {
-        g.shoe.cards.push_back(Card{Suit::Spades, r});
-    }
-    g.shoe.next = 0;
-}
 
 void test_game_setup() {
     {   // a new game starts in Betting with the money from the default rules
@@ -205,8 +194,8 @@ void test_game_double() {
         Game g(rng);
         stackShoe(g, {Rank::Five, Rank::Ten, Rank::Six, Rank::Seven, Rank::Nine});
         g.handleEvent(Event::Deal);                   // P 11, bankroll 198
-        g.handleEvent(Event::Double);                 // + 9 = 20
-        CHECK(g.bankroll == 196);
+        g.handleEvent(Event::Double);                 // + 9 = 20, bankroll 196; dealer 17 -> win
+        CHECK(g.bankroll == 196 + 8);                 // a doubled $4 win returns $8
         CHECK(g.player_hands[0].bet == 4);
         CHECK(g.player_hands[0].doubled);
         CHECK(g.player_hands[0].hand.cards.size() == 3);

@@ -9,6 +9,8 @@ void test_seeded_rng();
 void test_shoe();
 void test_shoe_penetration();
 void test_dealer();
+void test_hand_outcome();
+void test_payout();
 void test_game_setup();
 void test_game_betting();
 void test_game_deal();
@@ -16,6 +18,11 @@ void test_game_hit_stand();
 void test_game_double();
 void test_game_split();
 void test_game_round_over_and_broke();
+void test_game_payouts();
+void test_game_blackjack_payouts();
+void test_game_split_payouts();
+void test_game_broke();
+void test_game_bet_limits();
 
 int main() {
     test_card_value();
@@ -25,6 +32,8 @@ int main() {
     test_shoe();
     test_shoe_penetration();
     test_dealer();
+    test_hand_outcome();
+    test_payout();
     test_game_setup();
     test_game_betting();
     test_game_deal();
@@ -32,6 +41,11 @@ int main() {
     test_game_double();
     test_game_split();
     test_game_round_over_and_broke();
+    test_game_payouts();
+    test_game_blackjack_payouts();
+    test_game_split_payouts();
+    test_game_broke();
+    test_game_bet_limits();
 
     if(g_failures == 0){
         std::printf("All tests passed!\n");

@@ -1,5 +1,6 @@
 #include "game.h"
 #include "dealer.h"
+#include "payout.h"
 
 Game::Game(RandomGenerator& generator, const Rules& tableRules) : rules(tableRules), rng(generator) {
     shoe.shuffle(rng);
@@ -16,14 +17,37 @@ void Game::finishHand(){
         split_idx += 1;
     } else {
         playDealer();
+        settleRound();
+    }
+}
+
+void Game::settleRound(){
+    bool isSplit = player_hands.size() > 1;
+    for(const PlayerHand& ph : player_hands){
+        Outcome result = handOutcome(ph.hand, dealer, isSplit);
+        bankroll += payout(result, ph.bet, rules); 
+    }
+
+    // can't afford the minimum bet anymore -> Broke screen; otherwise show the results
+    if(bankroll < rules.minBet) {
+        current_phase = Phase::Broke;
+    } else {
         current_phase = Phase::RoundOver;
+    }
+}
+
+void Game::clampBet(){
+    if(bet > bankroll){
+        bet = (bankroll / rules.betStep) * rules.betStep; // round down to a whole number of betStep
     }
 }
 
 void Game::handleEvent(Event event) {
     switch(event) {
         case Event::BetUp:
-            if(current_phase == Phase::Betting && bet + rules.betStep <= rules.maxBet) {
+            if(current_phase == Phase::Betting && 
+                bet + rules.betStep <= rules.maxBet && 
+                bet + rules.betStep <= bankroll) {
                 bet += rules.betStep;
             }
             break;
@@ -49,7 +73,7 @@ void Game::handleEvent(Event event) {
                 dealer.addCard(shoe.dealCard());
                 
                 if(player_hands[split_idx].hand.isBlackjack() || dealer.isBlackjack()) {
-                    current_phase = Phase::RoundOver;
+                    settleRound();
                 } else {
                     current_phase = Phase::PlayerTurn; 
                 }
@@ -58,11 +82,13 @@ void Game::handleEvent(Event event) {
                 if(shoe.needsReshuffle(rules.penetrationPercent)){
                     shoe.shuffle(rng);            
                 }
+                clampBet();
                 current_phase = Phase::Betting;
             }
             else if(current_phase == Phase::Broke) {
                 bankroll = rules.startingBankroll;
                 shoe.shuffle(rng);
+                clampBet();
                 current_phase = Phase::Betting;
             }
             break;

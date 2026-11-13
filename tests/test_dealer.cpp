@@ -1,16 +1,7 @@
 // tests/test_dealer.cpp: tests for the dealer's hit/stand decision under S17 and H17
 #include "check.h"
+#include "test_helpers.h"
 #include "dealer.h"
-#include <vector>
-
-// builds a hand from ranks; suit doesn't matter for totals (test helper)
-static Hand makeHand(const std::vector<Rank>& ranks) {
-    Hand h;
-    for (Rank r : ranks) {
-        h.addCard(Card{Suit::Spades, r});
-    }
-    return h;
-}
 
 void test_dealer() {
     Rules s17;                                // default: dealer stands on all 17s
