@@ -16,7 +16,15 @@ void Game::finishHand(){
     if(split_idx + 1 < player_hands.size()){
         split_idx += 1;
     } else {
-        playDealer();
+        bool any_hand_alive = false;
+        for(const PlayerHand& player_hand : player_hands){
+            if(!player_hand.hand.isBust()){
+                any_hand_alive = true;
+            }
+        }
+        if(any_hand_alive){
+            playDealer();
+        }
         settleRound();
     }
 }
@@ -66,6 +74,29 @@ bool Game::canDouble() const{
     return true;
 }
 
+bool Game::canSplit() const{
+    if(current_phase != Phase::PlayerTurn){
+        return false;
+    }
+    if(player_hands[split_idx].hand.cards.size() != 2){
+        return false;
+    }
+    if(player_hands[split_idx].hand.cards[0].rank != player_hands[split_idx].hand.cards[1].rank){
+        return false;
+    }
+    if(!rules.canResplitAces && player_hands.size() > 1 && player_hands[split_idx].hand.cards[0].rank == Rank::Ace){
+        return false;
+    }
+    if(player_hands.size() >= static_cast<size_t>(rules.maxHands)){
+        return false;
+    }
+    if(bankroll < player_hands[split_idx].bet){
+        return false;
+    }
+
+    return true;
+}
+
 bool Game::isLegal(Event event) const{
     switch(event){
         case Event::BetUp:
@@ -85,11 +116,7 @@ bool Game::isLegal(Event event) const{
         case Event::Double:
             return canDouble();
         case Event::Split:
-            return current_phase == Phase::PlayerTurn && 
-                player_hands[split_idx].hand.cards.size() == 2 && 
-                player_hands[split_idx].hand.cards[0].rank == player_hands[split_idx].hand.cards[1].rank &&
-                player_hands.size() <static_cast<size_t>(rules.maxHands) &&
-                bankroll >= player_hands[split_idx].bet;
+            return canSplit();
     }
     return false;
 }
@@ -167,7 +194,12 @@ void Game::handleEvent(Event event) {
             player_hands[split_idx].hand.addCard(shoe.dealCard()); // Deal a new card to the original hand
             newHand.hand.addCard(shoe.dealCard()); // Deal a new card to the new hand
             player_hands.push_back(newHand); // Add the new hand to the list of player hands
-            current_phase = Phase::PlayerTurn; // Continue with the player's turn
+            
+            if(rules.oneCardOnSplitAces &&
+                player_hands[split_idx].hand.cards[0].rank == Rank::Ace){
+                    finishHand();
+                    finishHand();
+                }
             break;
         }
     }
