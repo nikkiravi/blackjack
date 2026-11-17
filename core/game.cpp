@@ -42,22 +42,69 @@ void Game::clampBet(){
     }
 }
 
+bool Game::canDouble() const{
+    if(current_phase != Phase::PlayerTurn){
+        return false;
+    }
+    
+    const PlayerHand& current_player_hand = player_hands[split_idx];
+    if(current_player_hand.hand.cards.size() != 2){
+        return false; // first two cards only
+    }
+    if(bankroll < current_player_hand.bet){
+        return false; // must afford the second bet
+    }
+    if(!rules.canDoubleAfterSplit && player_hands.size() > 1){
+        return false; // no doubling after a split
+    }
+
+    int total = current_player_hand.hand.total();
+    if(!rules.canDoubleAnyTwo && (total < 9 || total > 11)){
+        return false; //9-11 cards only
+    }
+
+    return true;
+}
+
+bool Game::isLegal(Event event) const{
+    switch(event){
+        case Event::BetUp:
+            return current_phase == Phase::Betting && 
+                bet + rules.betStep <= rules.maxBet && 
+                bet + rules.betStep <= bankroll;
+        case Event::BetDown:
+            return current_phase == Phase::Betting && bet - rules.betStep >= rules.minBet;
+        case Event::Deal:
+            return (current_phase == Phase::Betting && bankroll >= bet) ||
+                current_phase == Phase::RoundOver ||
+                current_phase == Phase::Broke;
+        case Event::Hit:
+            return current_phase == Phase::PlayerTurn;
+        case Event::Stand:
+            return current_phase == Phase::PlayerTurn;
+        case Event::Double:
+            return canDouble();
+        case Event::Split:
+            return current_phase == Phase::PlayerTurn && 
+                player_hands[split_idx].hand.cards.size() == 2 && 
+                player_hands[split_idx].hand.cards[0].rank == player_hands[split_idx].hand.cards[1].rank &&
+                player_hands.size() <static_cast<size_t>(rules.maxHands) &&
+                bankroll >= player_hands[split_idx].bet;
+    }
+    return false;
+}
+
 void Game::handleEvent(Event event) {
+    if(!isLegal(event)){ return; }
     switch(event) {
         case Event::BetUp:
-            if(current_phase == Phase::Betting && 
-                bet + rules.betStep <= rules.maxBet && 
-                bet + rules.betStep <= bankroll) {
-                bet += rules.betStep;
-            }
+            bet += rules.betStep;
             break;
         case Event::BetDown:
-            if(current_phase == Phase::Betting && bet - rules.betStep >= rules.minBet) {
-                bet -= rules.betStep;
-            }
+            bet -= rules.betStep;
             break;
         case Event::Deal:
-            if(current_phase == Phase::Betting && bankroll >= bet) {
+            if(current_phase == Phase::Betting) {
                 bankroll -= bet;
 
                 // Reset the game state for a new round
@@ -93,47 +140,35 @@ void Game::handleEvent(Event event) {
             }
             break;
         case Event::Hit:
-            if(current_phase == Phase::PlayerTurn) {
-                player_hands[split_idx].hand.addCard(shoe.dealCard());
-                if(player_hands[split_idx].hand.isBust()) {
-                    finishHand();
-                } else {
-                    current_phase = Phase::PlayerTurn; // Continue player's turn
-                }
+            player_hands[split_idx].hand.addCard(shoe.dealCard());
+            if(player_hands[split_idx].hand.isBust()) {
+                finishHand();
+            } else {
+                current_phase = Phase::PlayerTurn; // Continue player's turn
             }
             break;
         case Event::Stand:
-            if(current_phase == Phase::PlayerTurn) {
-                finishHand();
-            }
+            finishHand();
             break;
         case Event::Double:
-            if(current_phase == Phase::PlayerTurn && bankroll >= player_hands[split_idx].bet) {
-                bankroll -= player_hands[split_idx].bet; // Deduct the additional bet amount
-                player_hands[split_idx].bet *= 2; // Double the bet
-                player_hands[split_idx].doubled = true; // Mark the hand as doubled
-                player_hands[split_idx].hand.addCard(shoe.dealCard()); // Deal one more card to the hand
-                finishHand();
-            }
+            bankroll -= player_hands[split_idx].bet; // Deduct the additional bet amount
+            player_hands[split_idx].bet *= 2; // Double the bet
+            player_hands[split_idx].doubled = true; // Mark the hand as doubled
+            player_hands[split_idx].hand.addCard(shoe.dealCard()); // Deal one more card to the hand
+            finishHand();
             break;
-        case Event::Split:
-            if(current_phase == Phase::PlayerTurn && 
-                player_hands[split_idx].hand.cards.size() == 2 && 
-                player_hands[split_idx].hand.cards[0].rank == player_hands[split_idx].hand.cards[1].rank &&
-                player_hands.size() <static_cast<size_t>(rules.maxHands) &&
-                bankroll >= player_hands[split_idx].bet) {
-                
-                // Deduct the additional bet amount for the new hand
-                bankroll -= player_hands[split_idx].bet; 
-                PlayerHand newHand{Hand(), player_hands[split_idx].bet, false};
-                newHand.hand.addCard(player_hands[split_idx].hand.cards[1]); // Move the second card to the new hand
-                
-                player_hands[split_idx].hand.cards.pop_back(); // Remove the second card from the original hand
-                player_hands[split_idx].hand.addCard(shoe.dealCard()); // Deal a new card to the original hand
-                newHand.hand.addCard(shoe.dealCard()); // Deal a new card to the new hand
-                player_hands.push_back(newHand); // Add the new hand to the list of player hands
-                current_phase = Phase::PlayerTurn; // Continue with the player's turn
-            }
+        case Event::Split: {
+            // Deduct the additional bet amount for the new hand
+            bankroll -= player_hands[split_idx].bet; 
+            PlayerHand newHand{Hand(), player_hands[split_idx].bet, false};
+            newHand.hand.addCard(player_hands[split_idx].hand.cards[1]); // Move the second card to the new hand
+            
+            player_hands[split_idx].hand.cards.pop_back(); // Remove the second card from the original hand
+            player_hands[split_idx].hand.addCard(shoe.dealCard()); // Deal a new card to the original hand
+            newHand.hand.addCard(shoe.dealCard()); // Deal a new card to the new hand
+            player_hands.push_back(newHand); // Add the new hand to the list of player hands
+            current_phase = Phase::PlayerTurn; // Continue with the player's turn
             break;
+        }
     }
 }

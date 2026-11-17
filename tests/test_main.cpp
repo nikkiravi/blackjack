@@ -23,6 +23,9 @@ void test_game_blackjack_payouts();
 void test_game_split_payouts();
 void test_game_broke();
 void test_game_bet_limits();
+void test_can_double();
+void test_is_legal();
+void test_illegal_presses_ignored();
 
 int main() {
     test_card_value();
@@ -46,6 +49,9 @@ int main() {
     test_game_split_payouts();
     test_game_broke();
     test_game_bet_limits();
+    test_can_double();
+    test_is_legal();
+    test_illegal_presses_ignored();
 
     if(g_failures == 0){
         std::printf("All tests passed!\n");
