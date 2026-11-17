@@ -26,6 +26,7 @@ struct Game {
 
     void handleEvent(Event event); // process a player action and advance the game state
     bool canDouble() const; // should we double?
+    bool canSplit() const; // should we split?
     bool isLegal(Event event) const; // check if event is legal
 
 private:

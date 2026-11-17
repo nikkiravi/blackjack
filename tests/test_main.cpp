@@ -26,6 +26,10 @@ void test_game_bet_limits();
 void test_can_double();
 void test_is_legal();
 void test_illegal_presses_ignored();
+void test_can_split();
+void test_resplit_aces();
+void test_split_aces_one_card();
+void test_skip_dealer_when_all_bust();
 
 int main() {
     test_card_value();
@@ -52,6 +56,10 @@ int main() {
     test_can_double();
     test_is_legal();
     test_illegal_presses_ignored();
+    test_can_split();
+    test_resplit_aces();
+    test_split_aces_one_card();
+    test_skip_dealer_when_all_bust();
 
     if(g_failures == 0){
         std::printf("All tests passed!\n");
