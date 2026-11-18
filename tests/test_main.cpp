@@ -30,6 +30,8 @@ void test_can_split();
 void test_resplit_aces();
 void test_split_aces_one_card();
 void test_skip_dealer_when_all_bust();
+void test_fake_storage();
+void test_file_storage();
 
 int main() {
     test_card_value();
@@ -60,6 +62,8 @@ int main() {
     test_resplit_aces();
     test_split_aces_one_card();
     test_skip_dealer_when_all_bust();
+    test_fake_storage();
+    test_file_storage();
 
     if(g_failures == 0){
         std::printf("All tests passed!\n");
