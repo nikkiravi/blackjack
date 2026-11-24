@@ -18,6 +18,66 @@ const int CARD_PAD = 4;       // gap between a card's edge and the rank text
 const int CARD_GAP = 10;      // space between neighbouring cards in a hand
 const int CARD_INSET = 3;     // gap between a card back's edge and its decorative border
 
+const unsigned long REVEAL_PAUSE_MS = 2000;   // how long the final cards show before the result banner appears
+
+// one push button (INPUT_PULLUP: HIGH = not pressed, LOW = pressed), plus what debouncing needs to remember
+struct Button {
+  int pin;                          // which GPIO it's wired to
+  int stableState = HIGH;           // the trusted reading, only changes once the pin has settled
+  int lastRaw = HIGH;               // the latest digitalRead, bounces and all
+  unsigned long lastChangeMs = 0;   // millis() when lastRaw last changed (0 = nothing has changed yet)
+};
+
+// the play buttons, plus the knob's press (only the pin is given; the other fields start at their defaults)
+Button hitButton{26};      // green  (D26, small board row 13)
+Button standButton{25};    // red    (D25, small board row 12)
+Button doubleButton{33};   // yellow (D33, small board row 11)
+Button splitButton{32};    // blue   (D32, small board row 10)
+Button knobButton{13};     // pressing the knob = Deal (D13, small board row 17)
+
+// the knob's turning pins (KY-040 rotary encoder)
+const int KNOB_CLK = 27;   // D27, small board row 14 (rotation signal A)
+const int KNOB_DT  = 14;   // D14, small board row 15 (rotation signal B)
+
+const unsigned long DEBOUNCE_MS = 20;   // a change only counts once the pin has stayed put this long (bounces last a few ms)
+
+// reads a button and debounces it; call it on every loop() pass
+// returns true only when stableState really changed (pressed or released), never for a bounce
+bool updateButton(Button& button){
+  int raw = digitalRead(button.pin);
+  unsigned long now = millis();
+
+  if(raw != button.lastRaw) { // the pin moved
+    button.lastRaw = raw; 
+    button.lastChangeMs = now; // restart the "how long has it been steady" clock
+    return false;
+  }
+
+  if(now - button.lastChangeMs >= DEBOUNCE_MS && raw != button.stableState) {
+    button.stableState = raw; // steady long enough: it's a real change
+    return true;
+  }
+
+  return false;
+}
+
+// remembers CLK from the previous loop() pass, to spot the moment it falls
+int lastClk = HIGH;
+
+// true once per click of the knob; sets out to BetUp (clockwise) or BetDown (counter-clockwise)
+// rule (from the knob test): at the moment CLK falls, DT is still HIGH when turning clockwise, already LOW counter-clockwise
+bool knobTurned(Event& out) {
+  int clk = digitalRead(KNOB_CLK);
+  bool turned = false;
+  if(lastClk == HIGH && clk == LOW) {                                        // CLK just fell
+    out = (digitalRead(KNOB_DT) == HIGH) ? Event::BetUp : Event::BetDown;
+    turned = true;
+  }
+  lastClk = clk;            // remember for next time, whether or not it fell
+  return turned;
+}
+
+
 // "A", "2" ... "10", "J", "Q", "K" 
 static std::string rankText(Rank rank){
   switch(rank){
@@ -176,9 +236,16 @@ void drawTable(const Game& game) {
   }
 
   // the round's result, big and on top of everything (so it must be drawn last)
+  // the first time a round ends, pause so the player can see the dealer's final cards before the banner covers them;
+  // later redraws of the same RoundOver screen (e.g. a button pressed that does nothing) show the banner straight away
+  static Phase lastDrawnPhase = Phase::Betting;   // static: remembered between calls to drawTable
   if(game.current_phase == Phase::RoundOver) {
+    if(lastDrawnPhase != Phase::RoundOver) {
+      delay(REVEAL_PAUSE_MS);
+    }
     drawResultBanner(game);
   }
+  lastDrawnPhase = game.current_phase;
 }
 
 // turns a typed key into a game event; false if the key isn't one of ours
@@ -198,14 +265,54 @@ bool keyToEvent(char key, Event& out) {
 
 void setup() {
   Serial.begin(115200);
+  pinMode(hitButton.pin, INPUT_PULLUP);    // buttons read HIGH normally, LOW while pressed
+  pinMode(standButton.pin, INPUT_PULLUP);
+  pinMode(doubleButton.pin, INPUT_PULLUP);
+  pinMode(splitButton.pin, INPUT_PULLUP);
+  pinMode(KNOB_CLK, INPUT_PULLUP);   // the KY-040 has its own pull-ups on CLK/DT, but these don't hurt
+  pinMode(KNOB_DT,  INPUT_PULLUP);
+  pinMode(knobButton.pin,  INPUT_PULLUP);   // the press switch often has no pull-up on the module, so this one matters
+  Serial.println("Blackjack gadget started: press a button");   // proves the board is running, even before any press
   tft.init();                      // also switches the backlight on (TFT_BL in TFT_eSPI's User_Setup.h)
-  tft.setRotation(3);              // landscape, 320 x 240 (1 = the same, turned 180 degrees)
+  tft.setRotation(1);              // landscape, 320 x 240 (3 = the same, turned 180 degrees)
 
   drawTable(game);                 // the whole table: dealer, player hand(s), money, message
 }
 
-// runs forever: wait for a key, hand it to the game, redraw
+// runs forever: turn button presses (and typed keys) into game events, then redraw
 void loop() {
+  // the knob: each click turns into BetUp (clockwise) or BetDown (counter-clockwise)
+  Event turn;
+  if(knobTurned(turn)) {
+    game.handleEvent(turn);
+    drawTable(game);
+  }
+
+  // pressing the knob = Deal (also "next round" after the result, and "start over" when broke)
+  if(updateButton(knobButton) && knobButton.stableState == LOW) {
+    game.handleEvent(Event::Deal);
+    drawTable(game);
+  }
+
+  // every button is checked on every pass (separate ifs, not else-if); only the press edge (going LOW) is an event,
+  // so holding a button or letting go does nothing. updateButton comes first so it runs on every pass (&& skips the rest)
+  if(updateButton(hitButton) && hitButton.stableState == LOW) {
+    game.handleEvent(Event::Hit);
+    drawTable(game);
+  }
+  if(updateButton(standButton) && standButton.stableState == LOW) {
+    game.handleEvent(Event::Stand);
+    drawTable(game);
+  }
+  if(updateButton(doubleButton) && doubleButton.stableState == LOW) {
+    game.handleEvent(Event::Double);
+    drawTable(game);
+  }
+  if(updateButton(splitButton) && splitButton.stableState == LOW) {
+    game.handleEvent(Event::Split);
+    drawTable(game);
+  }
+
   if(Serial.available() > 0) {                     // has a key been typed?
     char key = static_cast<char>(Serial.read());   // read() returns an int (-1 = nothing), so cast to char
     if(key == '\r' || key == '\n') {
