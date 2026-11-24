@@ -1,12 +1,12 @@
 // esp32/esp32.ino: the blackjack gadget (ESP32 + 2.8" TFT screen, later the knob and buttons); uses the same core/ as the PC
 
 #include <string>
-#include <TFT_eSPI.h>    // the screen library
-#include "game.h"        // from core/ (found through the blackjack_core link in ~/Arduino/libraries)
+#include <TFT_eSPI.h>    
+#include "game.h"        
 #include "rng.h"
+#include "payout.h"
 
-// the game and the screen; rng must come before game, because game keeps a reference to it
-SeededRandomGenerator rng(esp_random());   // seeded from the ESP32's hardware random number generator
+SeededRandomGenerator rng(esp_random());   
 Game game(rng);
 TFT_eSPI tft;
 
@@ -18,7 +18,7 @@ const int CARD_PAD = 4;       // gap between a card's edge and the rank text
 const int CARD_GAP = 10;      // space between neighbouring cards in a hand
 const int CARD_INSET = 3;     // gap between a card back's edge and its decorative border
 
-// "A", "2" ... "10", "J", "Q", "K" (the same as pc/main.cpp's rankText)
+// "A", "2" ... "10", "J", "Q", "K" 
 static std::string rankText(Rank rank){
   switch(rank){
     case Rank::Ace: return "A";
@@ -73,6 +73,49 @@ void drawCardBack(int x, int y) {
                     CARD_RADIUS, TFT_WHITE);
 }
 
+// a big banner across the middle of the screen with the round's overall result (drawn last, so it's on top)
+void drawResultBanner(const Game& game) {
+  // add up the whole round: what was bet, and what came back
+  bool isSplit = game.player_hands.size() > 1;
+  bool anyBlackjack = false;
+  int totalBet = 0;
+  int totalBack = 0;
+  for(const PlayerHand& player_hand : game.player_hands) {
+    Outcome outcome = handOutcome(player_hand.hand, game.dealer, isSplit);
+    if(outcome == Outcome::Blackjack) {
+      anyBlackjack = true;
+    }
+    totalBet  += player_hand.bet;
+    totalBack += payout(outcome, player_hand.bet, game.rules);   // money returned, bet included
+  }
+
+  // pick the words and color (PUSH unless the money says otherwise)
+  const char* text  = "PUSH";
+  uint16_t    color = TFT_WHITE;
+  if(anyBlackjack) {
+    text  = "BLACKJACK!";
+    color = TFT_YELLOW;
+  } else if(totalBack > totalBet) {
+    text  = "YOU WIN!";
+    color = TFT_YELLOW;
+  } else if(totalBack < totalBet) {
+    text  = "YOU LOSE";
+    color = TFT_RED;
+  }
+
+  // the box: dark, with a colored border, in the middle of the screen
+  tft.fillRoundRect(30, 80, 260, 80, 10, TFT_BLACK);
+  tft.drawRoundRect(30, 80, 260, 80, 10, color);
+
+  // the words, big and centered in the box
+  tft.setTextSize(4);
+  tft.setTextColor(color, TFT_BLACK);
+  tft.setTextDatum(MC_DATUM);
+  tft.drawString(text, 160, 120);
+  tft.setTextDatum(TL_DATUM);          // put things back the way drawTable expects
+  tft.setTextSize(2);
+}
+
 // draws the whole screen for the current phase (read-only, like the terminal's drawScreen)
 void drawTable(const Game& game) {
   tft.fillScreen(TFT_DARKGREEN);                // start from an empty table
@@ -94,8 +137,7 @@ void drawTable(const Game& game) {
     drawHand(20, 20, game.dealer);
   }
 
-  // player's hand(s) along the bottom: side by side after a split
-  // each hand is two short text lines (kept under ~12 characters so split hands fit in 150 px), then the cards
+  // player's hand(s) along the bottom
   const int totalY = 86;    // "TOTAL 19"
   const int betY   = 104;   // "BET $2"   (text size 2 is 16 px tall, so 18 px apart leaves a small gap)
   const int cardsY = 124;   // the cards, just under the bet line
@@ -107,8 +149,10 @@ void drawTable(const Game& game) {
 
       tft.setCursor(handX, totalY);
       tft.printf("TOTAL %d", player_hand.hand.total());
+
       tft.setCursor(handX, betY);
       tft.printf("BET $%d", player_hand.bet);
+
       drawHand(handX, cardsY, player_hand.hand);
 
       // during player turn, underline the hand being played (useful for split)
@@ -130,6 +174,26 @@ void drawTable(const Game& game) {
     case Phase::RoundOver:  tft.print("One more round?");          break;
     case Phase::Broke:      tft.print("Bankrupt! Press to retry"); break;
   }
+
+  // the round's result, big and on top of everything (so it must be drawn last)
+  if(game.current_phase == Phase::RoundOver) {
+    drawResultBanner(game);
+  }
+}
+
+// turns a typed key into a game event; false if the key isn't one of ours
+// (Serial Monitor stand-in for the knob and buttons, until they're wired)
+bool keyToEvent(char key, Event& out) {
+  switch(key) {
+    case '+': out = Event::BetUp;   return true;
+    case '-': out = Event::BetDown; return true;
+    case 'n': out = Event::Deal;    return true;   // "next": deal / continue (Enter can't be used here)
+    case 'h': out = Event::Hit;     return true;
+    case 's': out = Event::Stand;   return true;
+    case 'd': out = Event::Double;  return true;
+    case 'p': out = Event::Split;   return true;
+  }
+  return false;
 }
 
 void setup() {
@@ -137,11 +201,21 @@ void setup() {
   tft.init();                      // also switches the backlight on (TFT_BL in TFT_eSPI's User_Setup.h)
   tft.setRotation(3);              // landscape, 320 x 240 (1 = the same, turned 180 degrees)
 
-  game.handleEvent(Event::Deal);   // deal one round, as a test (until the buttons are wired)
   drawTable(game);                 // the whole table: dealer, player hand(s), money, message
 }
 
+// runs forever: wait for a key, hand it to the game, redraw
 void loop() {
-  Serial.printf("alive: bankroll %d\n", game.bankroll);
-  delay(1000);                     // once a second, so it doesn't flood the Serial Monitor
+  if(Serial.available() > 0) {                     // has a key been typed?
+    char key = static_cast<char>(Serial.read());   // read() returns an int (-1 = nothing), so cast to char
+    if(key == '\r' || key == '\n') {
+      return;                                      // the Serial Monitor's newline: ignore it
+    }
+
+    Event event;
+    if(keyToEvent(key, event)) {
+      game.handleEvent(event);
+      drawTable(game);                             // redraw only when something happened
+    }
+  }
 }
